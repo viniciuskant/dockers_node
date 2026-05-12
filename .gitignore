@@ -1,0 +1,107 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.env/
+.env.*
+
+# Environment variables
+.env
+
+# Backup files
+*.backup
+*.bak
+*.swp
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Docker volumes
+mariadb_data/
+influxdb-data/
+mqtt-broker-data/
+*.db
+*.bolt
+*.sqlite
+*.sqlite3
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.sublime-*
+
+# Python build
+build/
+dist/
+*.egg-info/
+
+# Test / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# SQLite 
+*.sqlite3
+
+# Docker Compose volumes locais
+volumes/
+data/
+backup/
+
+# Arquivos temporários do InfluxDB
+*.tsm
+*.wal
+*.tmp
+
+# Dados MQTT
+mosquitto/data/
+mosquitto/log/
+mosquitto.conf
+
+# Arquivos de dump/exportação
+*.dump
+*.csv
+*.jsonl
+
+# Arquivos de testes
+test_*.py
+*_test.py
+example_*.py
+
+# Notebooks (se usar)
+*.ipynb
+*.ipynb_checkpoints/
+
+# Arquivos de configuração locais
+docker-compose.override.yml
+*.local.yml
+
+# Relatórios e documentos gerados
+reports/
+*.html
+*.pdf
+
+# Arquivos de lock
+package-lock.json
+yarn.lock
+poetry.lock
+Pipfile.lock
+
+# Arquivos de runtime
+*.pid
+*.sock
+*.socket
