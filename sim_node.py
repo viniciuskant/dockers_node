@@ -6,9 +6,10 @@ import signal
 import sys
 import logging
 import os
-import ssl  #
+import ssl 
 import paho.mqtt.client as mqtt
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import sqlite3
 
 SENSORES = ["temperatura", "umidade", "pressao", "co2", "co", "so2", "no2", "ozonio", "pm25"]
 
@@ -43,11 +44,77 @@ class MQTTSensorSimulator:
         self.directions = {}
         self.steps_remaining = {}
 
+        self._init_local_db()
+
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
     def _is_docker(self):
         return os.path.exists("/.dockerenv")
+
+
+    def _init_local_db(self):
+        db_path = "/app/data/pending_messages.db" if self._is_docker() else "pending_messages.db"
+        
+        os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
+        
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pending_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mac TEXT NOT NULL,
+                sensor_name TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                error_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sent BOOLEAN DEFAULT 0,
+                retry_count INTEGER DEFAULT 0
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_sent ON pending_messages(sent)')
+        self.conn.commit()
+        
+        logging.info(f"Banco de dados local inicializado: {db_path}")
+    
+    def _save_to_local_db(self, mac, sensor_name, payload):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO pending_messages (mac, sensor_name, payload, error_time)
+                VALUES (?, ?, ?, ?)
+            ''', (mac, sensor_name, payload, datetime.now()))
+            self.conn.commit()
+            
+            cursor.execute('SELECT COUNT(*) FROM pending_messages WHERE sent = 0')
+            pending_count = cursor.fetchone()[0]
+            
+            logging.info(f"Mensagem salva localmente. Total pendentes: {pending_count}")
+            logging.debug(f"  MAC: {mac[-5:]} | Sensor: {sensor_name} | Payload: {payload[:100]}...")
+            
+        except Exception as e:
+            logging.error(f"Erro ao salvar no banco local: {e}")
+
+    def _get_pending_messages(self):
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    SELECT id, mac, sensor_name, payload 
+                    FROM pending_messages 
+                    WHERE sent = 0 
+                    ORDER BY error_time ASC
+                ''')
+                return cursor.fetchall()
+            except Exception as e:
+                logging.error(f"Erro ao recuperar mensagens pendentes: {e}")
+                return []
+            
+    def _mark_message_as_sent(self, msg_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('UPDATE pending_messages SET sent = 1 WHERE id = ?', (msg_id,))
+            self.conn.commit()
+        except Exception as e:
+            logging.error(f"Erro ao marcar mensagem como enviada: {e}")
 
     def _get_certs_paths(self):
         if self._is_docker():
@@ -174,22 +241,91 @@ class MQTTSensorSimulator:
             payload["message"]["mensagem_erro"] = "Falha na leitura do sensor"
         return topic, json.dumps(payload)
 
-    def _send_message(self, mac, sensor_name):
-        if not self.client:
-            logging.warning("Cliente MQTT não conectado")
+    def _flush_pending_messages(self):
+        pending = self._get_pending_messages()
+        
+        if not pending:
             return
+        
+        logging.info(f"Conexão restabelecida! {len(pending)} mensagens pendentes aguardando envio")
+        
+        start_time = datetime.now()
+        # 9 minutos máximo, preciso arrumar para ser baseado no tempo de coleta
+        minutes_limit = 9
+        max_duration = timedelta(minutes=minutes_limit)  
+        
+        for msg_id, mac, sensor_name, payload in pending:
+            if datetime.now() - start_time > max_duration:
+                logging.warning(f"Tempo limite de {minutes_limit} minutos atingido. {len(pending) - pending.index((msg_id, mac, sensor_name, payload))} mensagens não enviadas")
+                break
+            
+            try:
+                if not self.client or not self.client.is_connected():
+                    logging.error("Conexão perdida durante flush - interrompendo envio")
+                    break
+                
+                result = self.client.publish(sensor_name, payload, qos=2)
+                
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    self._mark_message_as_sent(msg_id)
+                    logging.info(f"Mensagem pendente enviada [{pending.index((msg_id, mac, sensor_name, payload)) + 1}/{len(pending)}] | MAC {mac[-5:]} | {sensor_name}")
+                else:
+                    logging.error(f"Falha ao enviar mensagem pendente (código {result.rc}) - mantendo na fila")
+                    
+            except Exception as e:
+                logging.error(f"Exceção ao enviar mensagem pendente: {e}")
+            
+            # aguardo 5 segundos entre mensagens para evitar sobrecarga
+            time.sleep(5)
+        
+        # Verifica quantas ainda estão pendentes
+        remaining = len([m for m in pending if not self._is_message_sent(m[0])])
+        if remaining > 0:
+            logging.info(f"Flush finalizado. {remaining} mensagens ainda pendentes")
+        else:
+            logging.info(f"Todas as {len(pending)} mensagens pendentes foram enviadas com sucesso!")
+    
+    def _is_message_sent(self, msg_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT sent FROM pending_messages WHERE id = ?', (msg_id,))
+            result = cursor.fetchone()
+            return result and result[0] == 1
+        except:
+            return False
 
+
+    def _send_message(self, mac, sensor_name):
         value = self._generate_sensor_value(mac, sensor_name)
         topic, payload = self._create_mqtt_message(sensor_name, value, mac)
-
+        
+        if not self.client or not self.client.is_connected():
+            logging.error(f"MAC {mac[-5:]} | Broker MQTT offline/indisponível")
+            self._save_to_local_db(mac, sensor_name, payload)
+            return
+        
         try:
-            result = self.client.publish(topic, payload, qos=1)
+            result = self.client.publish(topic, payload, qos=2)
+            
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 logging.info(f"MAC {mac[-5:]} | {topic}: {value if value is not None else 'ERRO'}")
+                
+                pending_count = len(self._get_pending_messages())
+                if pending_count > 0:
+                    logging.info(f"Conexão ativa detectada. {pending_count} mensagens aguardando envio...")
+                    self._flush_pending_messages()
+                    
+            elif result.rc == mqtt.MQTT_ERR_NO_CONN:
+                logging.error(f"MAC {mac[-5:]} | Broker MQTT fora do ar - salvando localmente")
+                self._save_to_local_db(mac, sensor_name, payload)
             else:
-                logging.error(f"Erro ao publicar (código {result.rc})")
+                logging.error(f"MAC {mac[-5:]} | Erro ao publicar (código {result.rc}) - salvando localmente")
+                self._save_to_local_db(mac, sensor_name, payload)
+                
         except Exception as e:
-            logging.error(f"Erro ao enviar: {e}")
+            logging.error(f"MAC {mac[-5:]} | Exceção ao enviar: {e} - salvando localmente")
+            self._save_to_local_db(mac, sensor_name, payload)
+
 
     def _send_device_batch(self, mac, sensors_list):
         for sensor in sensors_list:
@@ -238,6 +374,9 @@ class MQTTSensorSimulator:
             self.client.loop_stop()
             self.client.disconnect()
             logging.info("Desconectado do broker")
+        if hasattr(self, 'conn') and self.conn:
+            self.conn.close()
+            logging.info("Banco de dados local fechado")
 
     def send_single_sensor(self, sensor_name, interval=1):
         logging.info(f"Modo SINGLE: enviando '{sensor_name}' a cada {interval}s")

@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 RUN mkdir -p /app/certs
+RUN mkdir -p /app/data
 COPY certs/ca.crt certs/cliente.crt certs/cliente.key /app/certs/
 
 COPY sim_node.py .
