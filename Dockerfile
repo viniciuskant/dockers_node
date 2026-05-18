@@ -2,12 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy dependencies file and install packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your script into the container
+RUN mkdir -p /app/certs
+COPY certs/ca.crt certs/cliente.crt certs/cliente.key /app/certs/
+
 COPY sim_node.py .
 
-# Set the command to run your script with the arguments
-CMD ["python", "sim_node.py", "-H", "192.168.18.110", "-s", "temperatura,umidade,pressao,co2,co,so2,no2", "-m", "-d", "1", "-i", "600"]
+CMD ["python", "sim_node.py", "-H", "192.168.18.110", "-p", "8883", "-s", "temperatura,umidade,pressao,co2,co,so2,no2", "-m", "-d", "1", "-i", "600"]

@@ -1,12 +1,35 @@
-# MQTT Sensor Simulator
 
-Simulador de dispositivos IoT que envia dados de sensores via MQTT.
+# Guia  MQTT Simulator Node
 
-## Build e execução
+Anotações rápidas de como buildar, rodar e derrubar o container de simulação de sensores nos nodes.
+
+---
+
+## Requisitos antes de começar
+
+O script Python usa criptografia **mTLS**. Por isso, o container **Só vai funcionar** se os certificados deste node estiverem gerados e guardados na raiz da `certs/` com as permissões apenas de leitura:
+
+* `certs/ca.crt` (Permissão: 400)
+* `certs/cliente.crt` (Permissão: 400)
+* `certs/cliente.key` (Permissão: 400)
+
+
+---
+
+## Como fazer o Build
+
+Se alterar o código do `sim_node.py` ou o `Dockerfile`, precisa rebuildar a imagem dentro da pasta `dockers_node/`:
 
 ```bash
 docker build -t mqtt-simulator .
+```
 
+## Como rodar
+
+Comando oficial para subir o container puxando o hostname real, o MAC Address da placa eth0 e mapeando de forma segura os certificados que estão na Home do Linux:
+
+
+```bash
 docker run -d \
   --name mqtt-simulator-$(hostname) \
   --restart unless-stopped \
@@ -14,10 +37,32 @@ docker run -d \
   mqtt-simulator
 ```
 
-## Parar e remover container
+## Como parar
+
+Como estamos rodando o Docker puro (sem Compose), para derrubar e apagar o container use o rm -f:
+
 ```bash
-docker stop mqtt-simulator-$(hostname)
-docker rm mqtt-simulator-$(hostname)
+docker rm -f mqtt-simulator-$(hostname)
+```
+
+## Comandos Úteis de Monitoramento
+
+Ver se o container está de pé:
+
+```bash
+docker ps
+```
+
+Olhar os Logs (Ver se o mTLS conectou na porta 8883):
+
+```bash
+docker logs mqtt-simulator-$(hostname)
+```
+
+Ver o consumo de memória/CPU do container:
+
+```bash
+docker stats mqtt-simulator-$(hostname)
 ```
 
 ## Como funciona o MAC do dispositivo

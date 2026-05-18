@@ -6,6 +6,7 @@ import signal
 import sys
 import logging
 import os
+import ssl  #
 import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
 
@@ -29,7 +30,7 @@ logging.basicConfig(
 )
 
 class MQTTSensorSimulator:
-    def __init__(self, broker_host, broker_port=1883, error_rate=0.0, mac_count=1):
+    def __init__(self, broker_host, broker_port=8883, error_rate=0.0, mac_count=1):
         self.broker_host = broker_host
         self.broker_port = broker_port
         self.error_rate = error_rate
@@ -45,10 +46,22 @@ class MQTTSensorSimulator:
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-
     def _is_docker(self):
         return os.path.exists("/.dockerenv")
 
+    def _get_certs_paths(self):
+        if self._is_docker():
+            # arquivos mapeados para a pasta /app/certs/
+            base_path = "/app/certs"
+        else:
+            # fora do container, busca diretamente na home do usuário atual
+            base_path = os.path.expanduser("~")
+
+        return {
+            "ca": os.path.join(base_path, "ca.crt"),
+            "cert": os.path.join(base_path, "cliente.crt"),
+            "key": os.path.join(base_path, "cliente.key")
+        }
 
     def _get_device_mac(self):
         if self._is_docker():
@@ -57,7 +70,6 @@ class MQTTSensorSimulator:
                 return mac.strip().lower()
 
         interfaces = ["eth0", "enp0s3", "ens33", "wlan0", "wlp2s0"]
-
         for iface in interfaces:
             path = f"/sys/class/net/{iface}/address"
             if os.path.exists(path):
@@ -68,13 +80,9 @@ class MQTTSensorSimulator:
                         return mac
                 except:
                     pass
-
         return None
 
-
-
     def _generate_macs(self, count):
-        # gera o primeiro é fixo para facilitar testes no dashboard, e quando for executado nas TvBox basta passar que é um dispositivo
         macs = [self._get_device_mac()]
         for _ in range(count - 1):
             mac_bytes = [random.randint(0x00, 0xff) for _ in range(6)]
@@ -111,7 +119,6 @@ class MQTTSensorSimulator:
 
         last = self.last_values[mac].get(sensor_name)
 
-        # primeira leitura para este sensor neste MAC
         if last is None:
             new_val = round(random.uniform(min_val, max_val), cfg["decimals"])
             self.last_values[mac][sensor_name] = new_val
@@ -119,10 +126,9 @@ class MQTTSensorSimulator:
             self.steps_remaining[mac][sensor_name] = random.randint(15, 30)
             return new_val
 
-        # verifica se deve mudar de direção
         if self.steps_remaining[mac].get(sensor_name, 0) <= 0:
             current_dir = self.directions[mac].get(sensor_name, 'up')
-            if random.random() < 0.1:  # 10% de chance de inverter
+            if random.random() < 0.1:
                 self.directions[mac][sensor_name] = 'down' if current_dir == 'up' else 'up'
             self.steps_remaining[mac][sensor_name] = random.randint(15, 30)
 
@@ -136,8 +142,7 @@ class MQTTSensorSimulator:
             delta = random.uniform(-max_step, 0)
 
         new_val = last + delta
-        
-        # trata limites e força inversão se necessário
+
         if new_val > max_val:
             new_val = max_val
             self.directions[mac][sensor_name] = 'down'
@@ -191,20 +196,41 @@ class MQTTSensorSimulator:
             if not self.running:
                 break
             self._send_message(mac, sensor)
-            #evitar sobrecarga, mas mantém a sensação de lote
             time.sleep(0.05)
 
     def connect(self):
         self.client = mqtt.Client()
+
+        paths = self._get_certs_paths()
+        
+        if not (os.path.exists(paths["ca"]) and os.path.exists(paths["cert"]) and os.path.exists(paths["key"])):
+            logging.error(f"Certificados não encontrados nos caminhos calculados: {paths}")
+            return False
+
+        try:
+            # Configura os certificados no canal seguro
+            self.client.tls_set(
+                ca_certs=paths["ca"],
+                certfile=paths["cert"],
+                keyfile=paths["key"],
+                tls_version=ssl.PROTOCOL_TLSv1_2
+            )
+            # desativa a validação do hostname apenas se o CN do certificado do seu servidor 
+            # não bater exatamente com o IP dele (teste local)
+            self.client.tls_insecure_set(True) 
+            
+        except Exception as tls_err:
+            logging.error(f"Falha ao carregar configurações TLS/mTLS: {tls_err}")
+            return False
+
         try:
             self.client.connect(self.broker_host, self.broker_port, 60)
             self.client.loop_start()
-            logging.info(f"Conectado ao broker {self.broker_host}:{self.broker_port}")
+            logging.info(f"Conectado com mTLS seguro ao broker {self.broker_host}:{self.broker_port}")
             logging.info(f"Dispositivos simulados: {len(self.device_macs)} MACs")
-            logging.info(f"Taxa de erro simulada: {self.error_rate*100:.1f}%")
             return True
         except Exception as e:
-            logging.error(f"Erro ao conectar: {e}")
+            logging.error(f"Erro ao conectar com segurança mTLS: {e}")
             return False
 
     def disconnect(self):
@@ -245,7 +271,7 @@ class MQTTSensorSimulator:
 def main():
     parser = argparse.ArgumentParser(description="Simulador de sensores MQTT")
     parser.add_argument("-H", "--host", default="localhost", help="Host do broker MQTT")
-    parser.add_argument("-p", "--port", type=int, default=1883, help="Porta do broker MQTT")
+    parser.add_argument("-p", "--port", type=int, default=8883, help="Porta do broker MQTT")
     parser.add_argument("-s", "--sensors", default="temperatura,umidade", help="Lista de sensores separados por vírgula")
     parser.add_argument("-i", "--interval", type=float, default=2.0, help="Intervalo entre mensagens (segundos)")
     parser.add_argument("-e", "--error", type=float, default=0.0, help="Taxa de erro (0.0 a 1.0)")
@@ -279,6 +305,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
