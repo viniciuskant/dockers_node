@@ -5,6 +5,7 @@ import os
 import ssl
 import time
 import logging
+import OpenSSL.crypto as crypto
 
 import paho.mqtt.client as mqtt
 
@@ -14,17 +15,30 @@ PORT = 4815
 BROKER = os.getenv("BROKER_HOST", "192.168.18.110")
 BROKER_PORT = 8883
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+
+def get_cn_from_cert(cert_path):
+    with open(cert_path, "rb") as f:
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, f.read())
+    subject = cert.get_subject()
+    for component in subject.get_components():
+        if component[0].decode() == "CN":
+            return component[1].decode()
+    return None
+
+DEVICE_ID = get_cn_from_cert("/app/certs/cliente.crt")
 
 class MQTTSender:
 
     def __init__(self):
+        self.username = "publisher"
         self._init_db()
         self.client = mqtt.Client()
         self.client.tls_set(
             ca_certs="/app/certs/ca.crt",
             certfile="/app/certs/cliente.crt",
             keyfile="/app/certs/cliente.key",
+            cert_reqs=ssl.CERT_REQUIRED,
             tls_version=ssl.PROTOCOL_TLSv1_2
         )
 
@@ -128,7 +142,7 @@ def main():
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     msg = json.loads(line)
-                    topic = msg["sensor"]
+                    topic = f"nodes/{DEVICE_ID}/{msg['sensor']}"
                     sender.publish(topic, line)
 
 if __name__ == "__main__":

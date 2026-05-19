@@ -1,1 +1,5 @@
-paho-mqtt
+paho-mqtt>=1.6.1
+pyOpenSSL>=23.0.0
+influxdb-client>=1.30.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.0 

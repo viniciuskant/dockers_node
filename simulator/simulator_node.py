@@ -12,7 +12,11 @@ HOST = "0.0.0.0"
 PORT = 4815
 SENDER_HOST = os.getenv("SENDER_HOST", "localhost") 
 
-SENSORES = ["temperatura", "umidade", "pressao", "co2", "co", "so2", "no2", "ozonio", "pm25"]
+SENSORES = [
+    "temperatura", "umidade", "pressao",
+    "co2", "co", "so2", "no2",
+    "ozonio", "pm25"
+]
 
 SENSOR_CONFIGS = {
     "temperatura": {"min": -10, "max": 45, "unit": "°C", "decimals": 1},
