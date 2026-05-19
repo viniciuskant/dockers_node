@@ -1,18 +1,68 @@
 
-# Guia  MQTT Simulator Node
+# Projeto envio de dados via MQTT com Dockers
 
-Anotações rápidas de como buildar, rodar e derrubar o container de simulação de sensores nos nodes.
+Comunicação entre os containers
+
+Esse projeto usa dois containers Docker que trabalham juntos e se comunicam pela rede interna iot_network.
+
+- O primeiro container é o `simulator`, responsável por gerar os dados falsos dos sensores, como temperatura, umidade, co2, so2 e outros.
+- O segundo é o `mqtt-sender`, responsável por receber esses dados do simulador e fazer o envio para o broker MQTT usando conexão segura com certificados mTLS.
+
+A comunicação acontece porque os dois containers estão na mesma rede Docker (bridge), permitindo que o simulador encontre o sender. Essa separação foi feita para deixar a arquitetura mais organizada e mais próxima de um ambiente IoT real. Assim, o container de simulação pode ser removido facilmente e substituído por sensores físicos reais, sem precisar alterar a parte responsável pelo envio MQTT.
+
+
+## Como estão relacionados
+
+`simulator -> mqtt-sender -> Mosquitto (broker/server)`
+
+### Fluxo principal
+
+### Mecanismo de fallback (InfluxDB)
+
+O sistema possui um mecanismo de tolerância a falhas para a queda do Broker:
+
+* Em caso de indisponibilidade do Broker, as mensagens são armazenadas localmente em um banco SQLite3.
+* Assim que a conexão com o Broker é restabelecida:
+  - o sistema entra em um loop por tempo determinado reenviando as mensgens, assim que o tempo acaba ele
+* Esse processo garante não perda de dados durante falhas ou instabilidades
+
+
+### Fluxo principal
+
+O funcionamento da arquitetura acontece em etapas:
+
+- O simulator gera os dados falsos dos sensores IoT.
+- Esses dados são enviados via socket TCP para o container mqtt-sender.
+- O mqtt-sender recebe as mensagens e faz o envio para o Broker MQTT (Mosquitto) usando conexão segura com mTLS.
+
+Essa separação deixa o sistema mais organizado e facilita substituir futuramente o simulador por sensores físicos reais.
+
+### Mecanismo de fallback (SQLite)
+
+O sistema possui um mecanismo de tolerância a falhas para evitar perda de mensagens caso o Broker fique offline.
+
+Como funciona
+- Se o Broker MQTT estiver indisponível:
+    - As mensagens são armazenadas localmente em um banco SQLite3.
+    - O arquivo fica salvo em `/app/data/pending_messages.db`
+
+- Quando a conexão com o Broker volta:
+    - O mqtt-sender tenta reenviar automaticamente todas as mensagens pendentes.
+    - Após o envio com sucesso, as mensagens são marcadas como enviadas no banco.
+
+Esse mecanismo garante maior confiabilidade no envio dos dados IoT, evitando perda de informações durante falhas de rede, reinicializações do broker ou instabilidades temporárias. Note que enquanto o método `flush_pending()` está reenviando as mensagens armazenadas no SQLite, o mqtt-sender ainda continua recebendo novas mensagens da simulação. Como o envio de dados esperado para essa aplicação é baixo, essa estrutura se torna eficiente.
 
 ---
 
-## Requisitos antes de começar
+## Geração de certificados
 
-O script Python usa criptografia **mTLS**. Por isso, o container **Só vai funcionar** se os certificados deste node estiverem gerados e guardados na raiz da `certs/` com as permissões apenas de leitura:
+O script Python usa criptografia **mTLS**. Por isso, o container **Só vai funcionar** se os certificados deste node estiverem gerados e guardados na raiz da `certs/`, para segurança é recomendado que eles estejam com as permissões apenas de leitura:
 
 * `certs/ca.crt` (Permissão: 400)
 * `certs/cliente.crt` (Permissão: 400)
 * `certs/cliente.key` (Permissão: 400)
 
+Um script para gerar esse certificados pode se encontrado nesse [repositório](https://github.com/viniciuskant/dockers_server/blob/main/scripts/deploy_nodes.sh), esse repositório é onde está cofigurado o servidor para esssa aplicação.
 
 ---
 
