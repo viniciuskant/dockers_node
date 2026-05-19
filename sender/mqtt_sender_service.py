@@ -28,8 +28,6 @@ class MQTTSender:
             tls_version=ssl.PROTOCOL_TLSv1_2
         )
 
-        self.client.tls_insecure_set(True)
-
     def _init_db(self):
         os.makedirs("/app/data", exist_ok=True)
 
