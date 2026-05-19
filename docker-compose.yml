@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  sender:
+    build:
+      context: ./sender
+      dockerfile: Dockerfile
+    container_name: mqtt-sender-${HOSTNAME}
+    restart: unless-stopped
+    ports:
+      - "4815:4815"
+    volumes:
+      - ./data:/app/data
+      - ./certs:/app/certs
+    environment:
+      - BROKER_HOST=192.168.18.110
+    networks:
+      - iot_network
+
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    container_name: simulator-${HOSTNAME}
+    restart: unless-stopped
+    environment:
+      - DEVICE_MAC=${DEVICE_MAC}
+      - SENDER_HOST=mqtt-sender-${HOSTNAME}
+    depends_on:
+      - sender
+    networks:
+      - iot_network
+
+networks:
+  iot_network:
+    driver: bridge
