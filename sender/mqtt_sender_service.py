@@ -142,8 +142,14 @@ def main():
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     msg = json.loads(line)
-                    topic = f"nodes/{DEVICE_ID}/{msg['sensor']}"
-                    sender.publish(topic, line)
+                    
+                    if 'sensor' in msg:
+                        topic = f"nodes/{DEVICE_ID}/{msg['type_msg']}/{msg['sensor']}"
+                    else:
+                        topic = f"nodes/{DEVICE_ID}/{msg['type_msg']}"
+
+                    payload_message = json.dumps(msg["message"])
+                    sender.publish(topic, payload_message)
 
 if __name__ == "__main__":
     main()

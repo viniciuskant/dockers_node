@@ -27,19 +27,16 @@ SENSOR_CONFIGS = {
     "so2": {"min": 0, "max": 20, "unit": "ppm", "decimals": 1},
     "no2": {"min": 0, "max": 30, "unit": "ppm", "decimals": 1},
     "ozonio": {"min": 0, "max": 10, "unit": "ppm", "decimals": 2},
-    "pm25": {"min": 0, "max": 500, "unit": "µg/m³", "decimals": 0},
+    "pm25": {"min": 0, "max": 500, "unit": "µg/m3", "decimals": 0},
 }
 
-def build_payload(sensor_name, value, mac):
+def build_payload(sensor_name, value, type_msg):
     payload = {
-        "mac": mac,
+        "type_msg": type_msg,
         "sensor": sensor_name,
         "message": {
             "valor": value,
-            "unidade": SENSOR_CONFIGS[sensor_name]["unit"],
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "modelo_sensor": "AA000",
-            "status": "ok" if value is not None else "error"
         }
     }
 
@@ -72,7 +69,6 @@ def main():
     parser.add_argument("-s", "--sensors", default="temperatura")
     parser.add_argument("-i", "--interval", type=float, default=2)
     parser.add_argument("-e", "--error", type=float, default=0.0)
-    parser.add_argument("-m", "--mac", default=os.getenv("DEVICE_MAC"))
 
     args = parser.parse_args()
 
@@ -99,8 +95,8 @@ def main():
         for sensor in sensors:
 
             value = simulator.generate_value(sensor)
-
-            payload = build_payload(sensor, value, args.mac)
+            type_msg = "data"
+            payload = build_payload(sensor, value, type_msg)
 
             client.sendall((payload + "\n").encode())
 
