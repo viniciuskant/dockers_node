@@ -1,0 +1,8 @@
+0	sucesso
+10	erro build sender
+11	erro build simulator
+20	erro ao parar sender antigo
+30	erro ao subir sender
+31	sender não apareceu no docker ps
+40	erro ao subir simulator
+41	simulator não apareceu

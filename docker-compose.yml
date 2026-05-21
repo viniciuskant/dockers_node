@@ -5,7 +5,7 @@ services:
     build:
       context: ./sender
       dockerfile: Dockerfile
-    container_name: mqtt-sender-${HOSTNAME}
+    container_name: mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
     restart: unless-stopped
     ports:
       - "4815:4815"
@@ -21,11 +21,11 @@ services:
     build:
       context: ./simulator
       dockerfile: Dockerfile
-    container_name: simulator-${HOSTNAME}
+    container_name: simulator-${HOSTNAME}-${VERSION_DOCKER}
     restart: unless-stopped
     environment:
       - DEVICE_MAC=${DEVICE_MAC}
-      - SENDER_HOST=mqtt-sender-${HOSTNAME}
+      - SENDER_HOST=mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
     depends_on:
       - sender
     networks:
