@@ -6,12 +6,14 @@ import ssl
 import time
 import logging
 import threading
+
 import OpenSSL.crypto as crypto
 
 import paho.mqtt.client as mqtt
 
 HOST = "0.0.0.0"
 PORT = 4815
+TIMEOUT = 3
 
 BROKER = os.getenv("BROKER_HOST", "192.168.18.110")
 BROKER_PORT = 8883
@@ -146,53 +148,71 @@ class MQTTSender:
         except Exception:
             self.save_pending(topic, payload)
 
+def handle_client(conn, addr, sender):
+    logging.info(f"Cliente conectado: {addr}")
+    buffer = ""
+
+    try:
+        conn.settimeout(None) 
+
+        while True:
+            data = conn.recv(4096)
+
+            if not data:
+                break
+
+            buffer += data.decode()
+
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                try:
+                    msg = json.loads(line)
+
+                    if 'sensor' in msg:
+                        topic = f"nodes/{DEVICE_ID}/{msg['type_msg']}/{msg['sensor']}"
+                    else:
+                        topic = f"nodes/{DEVICE_ID}/{msg['type_msg']}"
+
+                    payload = json.dumps(msg["message"])
+
+                    sender.publish(topic, payload)
+
+                except json.JSONDecodeError as e:
+                    logging.error(f"JSON inválido: {e}")
+
+    except Exception as e:
+        logging.error(f"Erro cliente {addr}: {e}")
+
+    finally:
+        conn.close()
+        logging.info(f"Conexão encerrada: {addr}")
+
+
 def main():
     sender = MQTTSender()
     sender.connect_mqtt()
 
-
-    server = socket.socket(
-        socket.AF_INET,
-        socket.SOCK_STREAM
-    )
-
-
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
-    server.listen(5)
+    server.listen(10)
 
     logging.info(f"Escutando porta {PORT}")
 
-    try:
-        while True:
-            conn, addr = server.accept()
-            logging.info(f"Conexão: {addr}")
+    while True:
+        conn, addr = server.accept()
 
-            with conn:
-                buffer = ""
-                while True:
-                    data = conn.recv(4096)
-                    if not data:
-                        break
-                    buffer += data.decode()
+        thread = threading.Thread(
+            target=handle_client,
+            args=(conn, addr, sender),
+            daemon=True
+        )
 
-                    while "\n" in buffer:
-                        line, buffer = buffer.split("\n", 1)
-                        msg = json.loads(line)
-
-                        if 'sensor' in msg:
-                            topic = f"nodes/{DEVICE_ID}/{msg['type_msg']}/{msg['sensor']}"
-                        else:
-                            topic = f"nodes/{DEVICE_ID}/{msg['type_msg']}"
-
-                        payload_message = json.dumps(msg["message"])
-                        sender.publish(topic, payload_message)
-
-    except KeyboardInterrupt:
-        logging.info("Encerrando...")
-        sender.running = False
-        sender.flush_thread.join(timeout=2)
-        sender.client.loop_stop()
-        sender.conn.close()
+        thread.start()
 
 if __name__ == "__main__":
     main()
