@@ -18,6 +18,8 @@ TIMEOUT = 3
 BROKER = os.getenv("BROKER_HOST", "192.168.18.110")
 BROKER_PORT = 8883
 
+VERSION_DOCKER = os.getenv("VERSION_DOCKER")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
@@ -196,6 +198,10 @@ def handle_client(conn, addr, sender):
 def main():
     sender = MQTTSender()
     sender.connect_mqtt()
+    topic = f"nodes/{DEVICE_ID}/info"
+    mensagem  = f"Sistema iniciado na versao {VERSION_DOCKER}"
+    payload = json.dumps(mensagem)
+    sender.publish(topic,payload)
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
