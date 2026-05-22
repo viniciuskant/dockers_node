@@ -4,9 +4,9 @@ set -e
 
 TARGET_DIR="$HOME/dockers_node"
 HISTORY_DIR="$HOME/history"
-TEMP_DIR="/tmp/update_docker_temp"
+TEMP_DIR="/tmp/update_docker_temp/extract"
 
-source "$TEMP_DIR/extract/.env"
+source "$TEMP_DIR/.env"
 
 NEW_SENDER="mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}"
 NEW_SIMULATOR="simulator-${HOSTNAME}-${VERSION_DOCKER}"
