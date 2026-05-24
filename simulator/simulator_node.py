@@ -9,8 +9,12 @@ import os
 
 
 HOST = "0.0.0.0"
-PORT = 4815
-SENDER_HOST = os.getenv("SENDER_HOST", "localhost") 
+
+SENDER_PORT = os.getenv("SENDER_PORT")
+if SENDER_PORT is None:
+    raise EnvironmentError("Variável SENDER_PORT não definida")
+SENDER_PORT = int (SENDER_PORT)
+SENDER_HOST = "localhost"
 
 SENSORES = [
     "temperatura", "umidade", "pressao",

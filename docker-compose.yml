@@ -8,7 +8,7 @@ services:
     container_name: mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
     restart: unless-stopped
     ports:
-      - "4815:4815"
+      - "4815"
     volumes:
       - ./data:/app/data
       - ./certs:/app/certs
@@ -25,6 +25,7 @@ services:
     restart: unless-stopped
     environment:
       - SENDER_HOST=mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
+      - SENDER_PORT=${SENDER_PORT}
     depends_on:
       - sender
     networks:
