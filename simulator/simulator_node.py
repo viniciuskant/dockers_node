@@ -14,7 +14,10 @@ SENDER_PORT = os.getenv("SENDER_PORT")
 if SENDER_PORT is None:
     raise EnvironmentError("Variável SENDER_PORT não definida")
 SENDER_PORT = int (SENDER_PORT)
-SENDER_HOST = "localhost"
+
+SENDER_HOST = os.getenv("SENDER_HOST")
+if SENDER_HOST is None:
+    raise EnvironmentError("Variável SENDER_HOST não definida")
 
 SENSORES = [
     "temperatura", "umidade", "pressao",
