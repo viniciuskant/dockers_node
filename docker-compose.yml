@@ -8,12 +8,15 @@ services:
     container_name: mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
     restart: unless-stopped
     ports:
-      - "4815"
+      - "4815:4815"
     volumes:
       - ./data:/app/data
       - ./certs:/app/certs
-    env_file:
-      - ./sender/.env
+    environment:
+      VERSION_DOCKER : ${VERSION_DOCKER}
+      BROKER_HOST : ${BROKER_HOST}
+      MQTT_PORT : ${MQTT_PORT}
+
     networks:
       - iot_network
 
@@ -24,9 +27,8 @@ services:
     container_name: simulator-${HOSTNAME}-${VERSION_DOCKER}
     restart: unless-stopped
     environment:
-      - SENDER_HOST=mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
-    env_file:
-      - ./simulator/.env
+      SENDER_HOST: mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
+      SENDER_PORT: 4815
     depends_on:
       - sender
     networks:
