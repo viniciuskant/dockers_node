@@ -91,7 +91,7 @@ def main():
 
     while True:
         try:
-            client.connect((SENDER_HOST, PORT))
+            client.connect((SENDER_HOST, SENDER_PORT))
             break
         except:
             print("Aguardando sender...")
