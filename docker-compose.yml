@@ -13,7 +13,7 @@ services:
       - ./data:/app/data
       - ./certs:/app/certs
     env_file:
-      - .env
+      - ./sender/.env
     networks:
       - iot_network
 
