@@ -50,6 +50,8 @@ rm -rf "$TARGET_DIR/" 2>/dev/null || true
 mkdir -p "$TARGET_DIR/"
 
 cp -r "$TEMP_DIR/"* "$TARGET_DIR"
+cp -r "$TEMP_DIR/".env "$TARGET_DIR"
+
 
 # Certificados
 mkdir -p "$TARGET_DIR/certs/"
