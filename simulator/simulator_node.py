@@ -6,6 +6,13 @@ import json
 import random
 import argparse
 import os
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 
 HOST = "0.0.0.0"
@@ -94,7 +101,7 @@ def main():
             client.connect((SENDER_HOST, SENDER_PORT))
             break
         except:
-            print("Aguardando sender...")
+            logging.info(f"Aguardando sende ({SENDER_HOST}:{SENDER_PORT})...")
             time.sleep(2)
 
     while True:
@@ -107,7 +114,7 @@ def main():
 
             client.sendall((payload + "\n").encode())
 
-            print(f"Enviado ao sender: {sensor}")
+            logging.info(f"Enviado ao sender: {sensor}")
 
         time.sleep(args.interval)
 
