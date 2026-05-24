@@ -75,7 +75,7 @@ docker-compose down || true
 
 #!/bin/bash
 
-docker-compose up -d
+docker-compose up --build -d
 
 # validacao
 docker ps | grep "mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}" >/dev/null

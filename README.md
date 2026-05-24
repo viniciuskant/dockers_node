@@ -17,16 +17,6 @@ A comunicação acontece porque os dois containers estão na mesma rede Docker (
 
 ### Fluxo principal
 
-### Mecanismo de fallback (InfluxDB)
-
-O sistema possui um mecanismo de tolerância a falhas para a queda do Broker:
-
-* Em caso de indisponibilidade do Broker, as mensagens são armazenadas localmente em um banco SQLite3.
-* Assim que a conexão com o Broker é restabelecida:
-  - o sistema entra em um loop por tempo determinado reenviando as mensgens, assim que o tempo acaba ele
-* Esse processo garante não perda de dados durante falhas ou instabilidades
-
-
 ### Fluxo principal
 
 O funcionamento da arquitetura acontece em etapas:
@@ -68,70 +58,50 @@ Um script para gerar esse certificados pode se encontrado nesse [repositório](h
 
 ## Como fazer o Build
 
-Se alterar o código do `sim_node.py` ou o `Dockerfile`, precisa rebuildar a imagem dentro da pasta `dockers_node/`:
-
 ```bash
-docker build -t mqtt-simulator .
+docker-compose up --build -d
 ```
 
-## Como rodar
-
-Comando oficial para subir o container puxando o hostname real, o MAC Address da placa eth0 e mapeando de forma segura os certificados que estão na Home do Linux:
-
-
-```bash
-docker run -d \
-  --name mqtt-simulator-$(hostname) \
-  --restart unless-stopped \
-  -e DEVICE_MAC=$(cat /sys/class/net/eth0/address) \
-  mqtt-simulator
-```
-
-## Como parar
-
-Como estamos rodando o Docker puro (sem Compose), para derrubar e apagar o container use o rm -f:
-
-```bash
-docker rm -f mqtt-simulator-$(hostname)
-```
-
-## Comandos Úteis de Monitoramento
-
-Ver se o container está de pé:
-
-```bash
-docker ps
-```
-
-Olhar os Logs (Ver se o mTLS conectou na porta 8883):
-
-```bash
-docker logs mqtt-simulator-$(hostname)
-```
-
-Ver o consumo de memória/CPU do container:
-
-```bash
-docker stats mqtt-simulator-$(hostname)
-```
-
-## Como funciona o MAC do dispositivo
-
-O simulador define o identificador do dispositivo assim:
-
-    - Se estiver rodando em Docker → usa DEVICE_MAC (passado do host)
-    - Se estiver rodando direto na máquina → usa o MAC real da interface de rede (/sys/class/net/...)
 
 ## Objetivo da arquitetura
 
 O objetivo é simular o mais próximo possível de um ambiente IoT real:
 
     - Cada máquina ou container representa um dispositivo físico
-    - O MAC funciona como identificador único do device
-    - Em Docker, o MAC do host é repassado para manter consistência
     - Em ambiente local, o sistema detecta automaticamente o hardware real
 
 Isso permite que os dados enviados pareçam vir de sensores reais distribuídos em diferentes dispositivos.
+
+
+## Funcionamento do script `install.sh`
+O script install.sh é usado para atualizar e implantar os containers Docker do projeto (mqtt-sender e simulator), com mecanismos de backup e rollback para garantir alta disponibilidade.
+
+Fluxo:
+1. Lê as variáveis (ex.: VERSION_DOCKER) do arquivo .env que está em /tmp/update_docker_temp/extract.
+2. Cria um backup da versão atual (em $HOME/dockers_node) para $HOME/history/last.
+3. Remove o diretório ativo e copia os novos arquivos (código-fonte, docker-compose, etc.) do diretório temporário para $HOME/dockers_node.
+4. Copia os certificados mTLS (ca.crt, cliente.crt, cliente.key) da home do usuário para $HOME/dockers_node/certs/.
+5. Marca que rollback pode ser necessário (ROLLBACK_NEEDED=true), derruba containers antigos e sobe os novos com docker-compose up -d.
+6. Valida se os containers estão rodando (verifica nomes com HOSTNAME e VERSION_DOCKER).
+7. Se tudo ok, desativa rollback e encerra com sucesso.
+
+
+Rollback:
+- Se qualquer comando falhar (set -e), a função rollback é chamada.
+- O rollback restaura os arquivos do último backup ($HOME/history/last) e reinicia os containers com docker-compose up -d --build.
+- O rollback só é executado se ROLLBACK_NEEDED=true (ou seja, após o início da substituição).
+
+Pré-requisitos:
+- Diretório /tmp/update_docker_temp/extract com .env e todos os arquivos da aplicação.
+- Certificados na home do usuário ($HOME/ca.crt, $HOME/cliente.crt, $HOME/cliente.key).
+- Docker e Docker Compose instalados.
+
+Os quais são de responsabilidade do [repositório](https://github.com/viniciuskant/dockers_server) fazer, pois ele que cria os pacotes de versões e faz o gerenciamento de quem deve ser atualizado, é responsável pelo scritp de `update_node.sh` que é responsável por executar o install.
+
+OBSERVAÇÕES:
+- O script usa set -e para abortar em erro.
+- Os nomes dos containers incluem HOSTNAME e VERSION_DOCKER.
+- A comunicação entre containers depende da rede iot_network definida no docker-compose.yml.
 
 ## Resultado esperado
 
