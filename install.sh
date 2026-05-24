@@ -79,7 +79,7 @@ docker-compose up -d sender
 
 PORT=$(docker port mqtt-sender-${HOSTNAME}-${VERSION_DOCKER} 4815/tcp | cut -d: -f2)
 
-printf '\nSENDER_PORT=%s\n' "$PORT" >> ./sender/.env
+printf '\nSENDER_PORT=%s\n' "$PORT" >> ./simulator/.env
 printf '\nexport SENDER_PORT=%s\n' "$PORT" >> .env
 
 docker-compose up -d simulator
