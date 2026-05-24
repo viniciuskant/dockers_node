@@ -16,9 +16,19 @@ HOST = "0.0.0.0"
 PORT = 4815
 TIMEOUT = 3
 
-BROKER = os.getenv("SERVER")
+BROKER_HOST = os.getenv("BROKER_HOST")
+if BROKER_HOST is None:
+    raise EnvironmentError("Variável BROKER_HOST não definida")
+
 VERSION_DOCKER = os.getenv("VERSION_DOCKER")
-BROKER_PORT = 8883
+if VERSION_DOCKER is None:
+    raise EnvironmentError("Variável VERSION_DOCKER não definida")
+
+MQTT_PORT = os.getenv("MQTT_PORT")
+if MQTT_PORT is None:
+    raise EnvironmentError("Variável MQTT_PORT não definida")
+MQTT_PORT = int(MQTT_PORT)
+
 
 
 logging.basicConfig(
@@ -79,7 +89,7 @@ class MQTTSender:
     def connect_mqtt(self):
         while True:
             try:
-                self.client.connect(BROKER, BROKER_PORT, 60)
+                self.client.connect(BROKER_HOST, MQTT_PORT, 60)
                 self.client.loop_start()
                 logging.info("MQTT conectado")
                 return

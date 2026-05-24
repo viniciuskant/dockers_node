@@ -93,7 +93,7 @@ docker run -d \
   -p 4815:4815 \
   -v "$TARGET_DIR/data:/app/data" \
   -v "$TARGET_DIR/certs:/app/certs" \
-  -e BROKER_HOST="$SERVER" \
+  -e BROKER_HOST="$BROKER_HOST" \
   --network iot_network \
   "$NEW_SENDER"
 
