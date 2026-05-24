@@ -14,8 +14,6 @@ services:
       - ./certs:/app/certs
     env_file:
       - .env
-    environment:
-      - BROKER_HOST=192.168.18.110
     networks:
       - iot_network
 
@@ -26,6 +24,7 @@ services:
     container_name: simulator-${HOSTNAME}-${VERSION_DOCKER}
     restart: unless-stopped
     environment:
+      - DEVICE_MAC=${DEVICE_MAC}
       - SENDER_HOST=mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
     depends_on:
       - sender

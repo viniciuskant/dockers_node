@@ -6,6 +6,7 @@ import ssl
 import time
 import logging
 import threading
+from datetime import datetime, timezone
 
 import OpenSSL.crypto as crypto
 
@@ -15,10 +16,10 @@ HOST = "0.0.0.0"
 PORT = 4815
 TIMEOUT = 3
 
-BROKER = os.getenv("BROKER_HOST", "192.168.18.110")
+BROKER = os.getenv("SERVER")
+VERSION_DOCKER = os.getenv("VERSION_DOCKER")
 BROKER_PORT = 8883
 
-VERSION_DOCKER = os.getenv("VERSION_DOCKER")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -198,16 +199,21 @@ def handle_client(conn, addr, sender):
 def main():
     sender = MQTTSender()
     sender.connect_mqtt()
-    topic = f"nodes/{DEVICE_ID}/info"
-    mensagem  = f"Sistema iniciado na versao {VERSION_DOCKER}"
-    payload = json.dumps(mensagem)
-    sender.publish(topic,payload)
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
     server.listen(10)
 
     logging.info(f"Escutando porta {PORT}")
+    topic=f"nodes/{DEVICE_ID}/log/"
+    payload = {
+        "text": f"sistema na versao {VERSION_DOCKER}",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    payload = json.dumps(payload)
+
+    sender.publish(topic, payload)
+
 
     while True:
         conn, addr = server.accept()
