@@ -9,25 +9,13 @@ ESP_FLASH_ADDR=0x10000
 
 # Função para encontrar ESP32
 find_esp32_port() {
-    local candidates="/dev/ttyUSB* /dev/ttyACM* /dev/ttyS*"
-    local found_port=""
-    
-    for porta in $candidates; do
+    for porta in /dev/ttyUSB* /dev/ttyACM* /dev/ttyS*; do
         if [ -e "$porta" ]; then
-            echo "Testando porta: $porta"
-            if timeout 3s esptool.py --port "$porta" chip_id 2>/dev/null | grep -qi "esp32"; then
-                found_port="$porta"
-                echo "ESP32 confirmado na porta: $porta"
-                break
-            elif [ -z "$found_port" ]; then
-                # Fallback para portas seriais genéricas
-                found_port="$porta"
-                echo "AVISO: Dispositivo na porta $porta (não confirmado como ESP32)"
-            fi
+            echo "Usando porta: $porta" >&2
+            echo "$porta"
+            return
         fi
     done
-    
-    echo "$found_port"
 }
 
 # Verificar esptool
