@@ -1,10 +1,12 @@
 #!/bin/bash
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET_DIR="${1:-.}"
 
-mkdir -p "$SCRIPT_DIR/build"
+BUILD_DIR="$TARGET_DIR/build"
 
-arduino-cli compile  --fqbn esp32:esp32:esp32  --build-path "$SCRIPT_DIR/build"
+mkdir -p "$BUILD_DIR"
 
-mv "$SCRIPT_DIR/build/esp.ino.bin" "$SCRIPT_DIR/"
-rm -rf "$SCRIPT_DIR/build"
+arduino-cli compile  --fqbn esp32:esp32:esp32  --build-path "$BUILD_DIR"  "$TARGET_DIR"
+
+mv "$BUILD_DIR"/*.bin "$TARGET_DIR/"
+rm -rf "$BUILD_DIR"
