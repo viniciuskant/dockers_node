@@ -47,9 +47,12 @@ def main():
     parser.add_argument("-e", "--error", type=float, default=0.0)
     args = parser.parse_args()
 
-    serial_port = find_serial_port()
-    if serial_port is None:
-        raise RuntimeError("Nenhum dispositivo serial encontrado em /dev/ttyACM* ou /dev/ttyUSB*")
+    serial_port = None
+    while serial_port is None:
+        serial_port = find_serial_port()
+        if serial_port is None:
+            logger.info("Aguardando dispositivo serial em /dev/ttyACM* ou /dev/ttyUSB*...")
+            time.sleep(2)
     logger.info(f"Conectando ao dispositivo serial: {serial_port}")
     ser = serial.Serial(serial_port, 115200, timeout=0.3)
 
