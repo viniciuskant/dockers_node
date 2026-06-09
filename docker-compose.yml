@@ -26,6 +26,9 @@ services:
       dockerfile: Dockerfile
     container_name: simulator-${HOSTNAME}-${VERSION_DOCKER}
     restart: unless-stopped
+    devices:
+      - "/dev/ttyACM0:/dev/ttyACM0"
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
     environment:
       SENDER_HOST: mqtt-sender-${HOSTNAME}-${VERSION_DOCKER}
       SENDER_PORT: 4815
