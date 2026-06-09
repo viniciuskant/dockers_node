@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY simulator_node.py .
 
-CMD ["python", "simulator_node.py", "-s", "temperatura,umidade,pressao,co2", "-i", "60"]
+CMD ["python", "simulator_node.py", "-i", "60"]
