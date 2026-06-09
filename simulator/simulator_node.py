@@ -76,22 +76,20 @@ def main():
                 line = ser.readline().decode().strip()
                 if not line:
                     break
+
                 try:
-                    client.sendall((line + "\n").encode())
-                    logger.info(f"Enviado ao sender: {line[:100]}")
-                except (BrokenPipeError, ConnectionResetError):
-                    logger.error("Conexão com sender perdida, reconectando...")
-                    client.close()
-                    while True:
-                        try:
-                            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                            client.connect((SENDER_HOST, SENDER_PORT))
-                            logger.info("Reconectado ao sender")
-                            break
-                        except:
-                            time.sleep(2)
-                    client.sendall((line + "\n").encode())
-            time.sleep(args.interval)
+                    data = json.loads(line)
+
+                    data.pop("timestamp", None)
+                    data["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+                    message = json.dumps(data)
+
+                    client.sendall((message + "\n").encode())
+                    logger.info(f"Enviado ao sender: {message[:100]}")
+
+                except json.JSONDecodeError:
+                    logger.warning(f"Linha não é JSON válido: {line}")
         except serial.SerialException as e:
             logger.error(f"Erro na serial: {e}. Tentando reabrir...")
             ser.close()
