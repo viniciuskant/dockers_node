@@ -2,10 +2,7 @@
 
 set -e
 
-if [ -z "$IDF_PATH" ]; then
-    echo "ERRO: IDF_PATH não definido. Execute 'source \$HOME/esp/esp-idf/export.sh' primeiro."
-    exit 1
-fi
+source $HOME/esp/esp-idf/export.sh
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
