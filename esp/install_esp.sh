@@ -24,7 +24,7 @@ if command -v fuser &> /dev/null; then
     sleep 1
 fi
 
-esptool --chip esp32s3 --port "$PORT" --baud 115200 \
+esptool --chip esp32s3 --port "$PORT" --baud 460800 \
   write-flash \
   0x0 bootloader.bin \
   0x8000 partition-table.bin \
