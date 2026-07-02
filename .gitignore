@@ -109,5 +109,5 @@ Pipfile.lock
 *.sock
 *.socket
 
-
+firmware_esp/
 *.bin

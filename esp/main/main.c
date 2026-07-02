@@ -1,0 +1,152 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <math.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_random.h"
+#include "esp_timer.h"
+#include "cJSON.h"
+
+// Configurações
+#define COMANDO_VALIDO "readSensors"
+#define TAXA_ERRO 0.0f
+
+// Lista de sensores
+static const char *SENSORES[] = {
+    "temperatura", "umidade", "pressao",
+    "co2", "co", "so2", "no2",
+    "ozonio", "pm25"
+};
+
+#define NUM_SENSORES (sizeof(SENSORES) / sizeof(SENSORES[0]))
+
+typedef struct {
+    float min, max;
+    int decimais;
+} sensor_config_t;
+
+static const sensor_config_t SENSOR_CONFIGS[] = {
+    {-10.0f, 45.0f, 1},
+    {0.0f,   100.0f, 1},
+    {950.0f, 1050.0f, 1},
+    {300.0f, 2000.0f, 0},
+    {0.0f,   50.0f, 1},
+    {0.0f,   20.0f, 1},
+    {0.0f,   30.0f, 1},
+    {0.0f,   10.0f, 2},
+    {0.0f,   500.0f, 0}
+};
+
+bool gerar_valor_sensor(int idx, float *valor)
+{
+    if ((esp_random() % 100) / 100.0f < TAXA_ERRO)
+        return false;
+
+    const sensor_config_t *cfg = &SENSOR_CONFIGS[idx];
+    float range = cfg->max - cfg->min;
+
+    *valor = cfg->min + (esp_random() % 10000) / 10000.0f * range;
+
+    float mult = powf(10, cfg->decimais);
+    *valor = roundf(*valor * mult) / mult;
+
+    return true;
+}
+
+char *construir_payload(const char *sensor, float valor, bool valido)
+{
+    cJSON *root = cJSON_CreateObject();
+
+    cJSON_AddStringToObject(root, "type_msg", "data");
+    cJSON_AddStringToObject(root, "sensor", sensor);
+
+    cJSON *msg = cJSON_CreateObject();
+
+    if (valido)
+        cJSON_AddNumberToObject(msg, "valor", valor);
+    else
+        cJSON_AddStringToObject(msg, "mensagem_erro",
+                                "Falha na leitura do sensor");
+
+    cJSON_AddNumberToObject(msg, "timestamp",
+                            esp_timer_get_time() / 1000);
+
+    cJSON_AddItemToObject(root, "message", msg);
+
+    char *json = cJSON_PrintUnformatted(root);
+
+    cJSON_Delete(root);
+
+    return json;
+}
+
+void enviar_dados_todos_sensores(void)
+{
+    for (int i = 0; i < NUM_SENSORES; i++) {
+
+        float valor;
+        bool ok = gerar_valor_sensor(i, &valor);
+
+        char *payload = construir_payload(
+            SENSORES[i],
+            valor,
+            ok
+        );
+
+        printf("%s\n", payload);
+
+        free(payload);
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void processar_comando(char *cmd)
+{
+    if (strcmp(cmd, COMANDO_VALIDO) == 0) {
+        enviar_dados_todos_sensores();
+    } else {
+        printf("Comando desconhecido: %s\n", cmd);
+    }
+}
+
+void app_main(void)
+{
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    printf("ESP Sensor Simulator pronto.\n");
+    printf("Digite '%s' e pressione Enter.\n", COMANDO_VALIDO);
+
+    char rx_buffer[64];
+    int rx_len = 0;
+    char ch;
+
+    while (1) {
+
+        if (scanf("%c", &ch) == 1) {
+
+            if (ch == '\r' || ch == '\n') {
+
+                if (rx_len > 0) {
+
+                    rx_buffer[rx_len] = '\0';
+
+                    processar_comando(rx_buffer);
+
+                    rx_len = 0;
+                }
+
+            } else {
+
+                if (rx_len < sizeof(rx_buffer) - 1) {
+                    rx_buffer[rx_len++] = ch;
+                }
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}

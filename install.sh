@@ -84,6 +84,6 @@ docker ps | grep "simulator-${HOSTNAME}-${VERSION_DOCKER}" >/dev/null
 ROLLBACK_NEEDED=false
 
 # instalacao no esp
-esp/install_esp.sh
+firmware_esp/install_esp.sh
 
 exit 0
